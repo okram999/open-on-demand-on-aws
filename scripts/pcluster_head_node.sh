@@ -52,85 +52,85 @@ v2:
       sbatch: "/etc/ood/config/bin_overrides.py"
 EOF
 
-cat << EOF > /opt/slurm/etc/slurmdbd.conf
-ArchiveEvents=yes
-ArchiveJobs=yes
-ArchiveResvs=yes
-ArchiveSteps=no
-ArchiveSuspend=no
-ArchiveTXN=no
-ArchiveUsage=no
-AuthType=auth/munge
-DbdHost=$(hostname -s)
-DbdPort=6819
-DebugLevel=info
-PurgeEventAfter=1month
-PurgeJobAfter=12month
-PurgeResvAfter=1month
-PurgeStepAfter=1month
-PurgeSuspendAfter=1month
-PurgeTXNAfter=12month
-PurgeUsageAfter=24month
-SlurmUser=slurm
-LogFile=/var/log/slurmdbd.log
-PidFile=/var/run/slurmdbd.pid
-StorageType=accounting_storage/mysql
-StorageUser=$RDS_USER
-StoragePass=$RDS_PASSWORD
-StorageHost=$RDS_ENDPOINT # Endpoint from RDS console
-StoragePort=$RDS_PORT  # Port from RDS console
-StorageLoc=$RDS_DBNAME
-EOF
+# cat << EOF > /opt/slurm/etc/slurmdbd.conf
+# ArchiveEvents=yes
+# ArchiveJobs=yes
+# ArchiveResvs=yes
+# ArchiveSteps=no
+# ArchiveSuspend=no
+# ArchiveTXN=no
+# ArchiveUsage=no
+# AuthType=auth/munge
+# DbdHost=$(hostname -s)
+# DbdPort=6819
+# DebugLevel=info
+# PurgeEventAfter=1month
+# PurgeJobAfter=12month
+# PurgeResvAfter=1month
+# PurgeStepAfter=1month
+# PurgeSuspendAfter=1month
+# PurgeTXNAfter=12month
+# PurgeUsageAfter=24month
+# SlurmUser=slurm
+# LogFile=/var/log/slurmdbd.log
+# PidFile=/var/run/slurmdbd.pid
+# StorageType=accounting_storage/mysql
+# StorageUser=$RDS_USER
+# StoragePass=$RDS_PASSWORD
+# StorageHost=$RDS_ENDPOINT # Endpoint from RDS console
+# StoragePort=$RDS_PORT  # Port from RDS console
+# StorageLoc=$RDS_DBNAME
+# EOF
 
-cat << EOF >> /opt/slurm/etc/slurm.conf
-# ACCOUNTING
-JobAcctGatherType=jobacct_gather/linux
-JobAcctGatherFrequency=30
-AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageHost=$(hostname -s)
-AccountingStorageUser=$RDS_USER
-AccountingStoragePort=6819
-EOF
+# cat << EOF >> /opt/slurm/etc/slurm.conf
+# # ACCOUNTING
+# JobAcctGatherType=jobacct_gather/linux
+# JobAcctGatherFrequency=30
+# AccountingStorageType=accounting_storage/slurmdbd
+# AccountingStorageHost=$(hostname -s)
+# AccountingStorageUser=$RDS_USER
+# AccountingStoragePort=6819
+# EOF
 
-chmod 600 /opt/slurm/etc/slurmdbd.conf
-chown slurm /opt/slurm/etc/slurmdbd.conf
+# chmod 600 /opt/slurm/etc/slurmdbd.conf
+# chown slurm /opt/slurm/etc/slurmdbd.conf
 
-# TODO: Create if doesn't exist (dependson PCluster version)
+# # TODO: Create if doesn't exist (dependson PCluster version)
 
-# Check if the slurmdbd.service exists
-if [ ! -f /etc/systemd/system/slurmdbd.service ]; then
-  cat <<EOF >> /etc/systemd/system/slurmdbd.service
-  [Unit]
-  Description=Slurm DBD accounting daemon
-  After=network.target munge.service
-  ConditionPathExists=/opt/slurm/etc/slurmdbd.conf
+# # Check if the slurmdbd.service exists
+# if [ ! -f /etc/systemd/system/slurmdbd.service ]; then
+#   cat <<EOF >> /etc/systemd/system/slurmdbd.service
+#   [Unit]
+#   Description=Slurm DBD accounting daemon
+#   After=network.target munge.service
+#   ConditionPathExists=/opt/slurm/etc/slurmdbd.conf
   
-  [Service]
-  Type=simple
-  Restart=always
-  StartLimitIntervalSec=0
-  RestartSec=5
-  ExecStart=/opt/slurm/sbin/slurmdbd -D $SLURMDBD_OPTIONS
-  ExecReload=/bin/kill -HUP $MAINPID
-  LimitNOFILE=65536
-  TasksMax=infinity
-  ExecStartPost=/bin/systemctl restart slurmctld
+#   [Service]
+#   Type=simple
+#   Restart=always
+#   StartLimitIntervalSec=0
+#   RestartSec=5
+#   ExecStart=/opt/slurm/sbin/slurmdbd -D $SLURMDBD_OPTIONS
+#   ExecReload=/bin/kill -HUP $MAINPID
+#   LimitNOFILE=65536
+#   TasksMax=infinity
+#   ExecStartPost=/bin/systemctl restart slurmctld
   
-  [Install]
-  WantedBy=multi-user.target
+#   [Install]
+#   WantedBy=multi-user.target
   
-EOF
-fi
+# EOF
+# fi
 
-# Start SLURM accounting
-systemctl daemon-reload
-systemctl enable slurmdbd
-systemctl start slurmdbd
+# # Start SLURM accounting
+# systemctl daemon-reload
+# systemctl enable slurmdbd
+# systemctl start slurmdbd
 
-echo "Adding '$CLUSTER_NAME' to slurm accounting"
-systemctl start slurmctld
-sacctmgr --quiet add cluster $CLUSTER_NAME
-echo "sacctmgr output: $(sacctmgr show cluster)"
+# echo "Adding '$CLUSTER_NAME' to slurm accounting"
+# systemctl start slurmctld
+# sacctmgr --quiet add cluster $CLUSTER_NAME
+# echo "sacctmgr output: $(sacctmgr show cluster)"
 
 # Copy the cluster config to S3
 aws s3 cp /etc/ood/config/clusters.d/$CLUSTER_NAME.yml s3://$S3_CONFIG_BUCKET/clusters/$CLUSTER_NAME.yml
